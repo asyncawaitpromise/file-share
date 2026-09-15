@@ -84,8 +84,8 @@ jobs:
 
           ENV_VARS=$(jq -nc \
             --arg app "$APP_NAME" \
-            --arg jwt "${{ secrets.JWT_SECRET }}" \
-            '{"appName":$app,"instanceCount":1,"envVars":[{"key":"NODE_ENV","value":"production"},{"key":"PORT","value":"8080"},{"key":"JWT_SECRET","value":$jwt}]}')
+            --arg admin "${{ secrets.ADMIN_PASSWORD }}" \
+            '{"appName":$app,"instanceCount":1,"envVars":[{"key":"NODE_ENV","value":"production"},{"key":"PORT","value":"8080"},{"key":"ADMIN_PASSWORD","value":$admin}]}')
           curl -sf -X POST "$CAPROVER_URL/api/v2/user/apps/appDefinitions/update" \
             -H "Content-Type: application/json" \
             -H "x-captain-auth: $ADMIN_TOKEN" \

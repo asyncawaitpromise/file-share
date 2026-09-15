@@ -1,21 +1,15 @@
 /**
  * Centralized HTTP client.
  *
- * Automatically attaches the current user's Authorization header on every
- * request. Throws ApiError on non-2xx responses so callers can use a single
+ * No auth tokens — the anonymous session and admin login both ride on
+ * httpOnly cookies, so every request just needs credentials: 'include'.
+ * Throws ApiError on non-2xx responses so callers can use a single
  * try/catch instead of manually checking res.ok.
  *
  * Usage:
  *   import { apiClient } from './apiClient.ts';
- *   const data = await apiClient.get('/api/widgets');
- *   const data = await apiClient.post('/api/widgets', { name: 'foo' });
- *
- * Non-React usage (e.g. in a store or service):
- *   import { useAuthStore } from '../store/authStore.ts';
- *   const token = useAuthStore.getState().token;  // no hook needed
+ *   const data = await apiClient.get('/api/session/history');
  */
-
-import { useAuthStore } from '../store/authStore.ts'
 
 export class ApiError extends Error {
   status: number
@@ -27,17 +21,11 @@ export class ApiError extends Error {
 }
 
 async function request<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
-  const token = useAuthStore.getState().token
-  const headers: HeadersInit = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  }
-
-  const res = await fetch(url, { ...options, headers })
+  const res = await fetch(url, { ...options, credentials: 'include' })
 
   if (res.status === 204) return null as T
 
-  const data = await res.json() as T & { error?: string }
+  const data = await res.json().catch(() => ({})) as T & { error?: string }
   if (!res.ok) throw new ApiError((data as { error?: string }).error ?? `HTTP ${res.status}`, res.status)
   return data
 }
@@ -46,11 +34,12 @@ export const apiClient = {
   get: <T = unknown>(url: string) =>
     request<T>(url),
 
-  post: <T = unknown>(url: string, body: unknown) =>
+  post: <T = unknown>(url: string, body?: unknown) =>
     request<T>(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      ...(body !== undefined
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        : {}),
     }),
 
   patch: <T = unknown>(url: string, body: unknown) =>
@@ -62,8 +51,4 @@ export const apiClient = {
 
   delete: <T = unknown>(url: string) =>
     request<T>(url, { method: 'DELETE' }),
-
-  // FormData upload — do NOT set Content-Type; the browser adds the boundary.
-  postForm: <T = unknown>(url: string, formData: FormData) =>
-    request<T>(url, { method: 'POST', body: formData }),
 }

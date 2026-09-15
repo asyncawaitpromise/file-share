@@ -1,6 +1,5 @@
 packages:
   - client
 
-allowBuilds:
-  better-sqlite3: true
-  esbuild: false
+onlyBuiltDependencies:
+  - better-sqlite3

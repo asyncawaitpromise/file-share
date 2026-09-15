@@ -61,18 +61,10 @@ get() { echo "${ENV[$1]:-}"; }
 ROUTING=(
   # Runtime vars — live in both GH (for CI deploy) and CapRover (container)
   "PORT:n:y"
-  "JWT_SECRET:y:y"
-  "ADMIN_USERS:y:y"
-
-  # OAuth — runtime, needed in container
-  "GOOGLE_CLIENT_ID:y:y"
-  "GOOGLE_CLIENT_SECRET:y:y"
-  "GITHUB_CLIENT_ID:y:y"
-  "GITHUB_CLIENT_SECRET:y:y"
-  "DISCORD_CLIENT_ID:y:y"
-  "DISCORD_CLIENT_SECRET:y:y"
-  "OAUTH_CALLBACK_BASE:y:y"
-  "OAUTH_REDIRECT_URL:y:y"
+  "ADMIN_PASSWORD:y:y"
+  "MAX_UPLOAD_MB:y:y"
+  "DOWNLOAD_GRACE_MINUTES:y:y"
+  "CORS_ORIGINS:y:y"
 
   # CapRover infra — used by CI to deploy, not injected into the running app
   "CAPROVER_URL:y:n"

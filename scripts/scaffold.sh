@@ -101,11 +101,7 @@ fi
 echo "==> Configuring app..."
 
 ENV_JSON='[{"key":"NODE_ENV","value":"production"}]'
-for key in JWT_SECRET PORT ADMIN_USERS \
-           GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET \
-           GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET \
-           DISCORD_CLIENT_ID DISCORD_CLIENT_SECRET \
-           OAUTH_CALLBACK_BASE OAUTH_REDIRECT_URL; do
+for key in PORT ADMIN_PASSWORD MAX_UPLOAD_MB DOWNLOAD_GRACE_MINUTES CORS_ORIGINS; do
   val="$(get $key)"
   [[ -z "$val" ]] && continue
   ENV_JSON=$(jq -n \

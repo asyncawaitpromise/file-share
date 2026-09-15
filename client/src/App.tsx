@@ -1,14 +1,13 @@
-import { Component, useEffect, type ReactNode } from 'react'
+import { Component, type ReactNode } from 'react'
 import type { ErrorInfo } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { useAuthStore } from './store/authStore.ts'
-import { ProtectedRoute, PublicOnlyRoute, OptionalRoute, AdminRoute } from './components/AuthWrapper.tsx'
+import { useThemeStore } from './store/themeStore.ts'
+import Navbar from './components/Navbar.tsx'
 import Home from './routes/Home.tsx'
-import Dashboard from './routes/Dashboard.tsx'
-import SignIn from './routes/SignIn.tsx'
-import SignUp from './routes/SignUp.tsx'
-import Settings from './routes/Settings.tsx'
-import AuthCallback from './routes/AuthCallback.tsx'
+import UploadPage from './routes/UploadPage.tsx'
+import DownloadPage from './routes/DownloadPage.tsx'
+import HistoryPage from './routes/HistoryPage.tsx'
+import AdminPage from './routes/AdminPage.tsx'
 
 // Catches render errors anywhere in the tree and shows a fallback UI.
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -41,32 +40,18 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 const ThemedApp = () => {
-  const { user, initialize, preferredTheme, setPreferredTheme } = useAuthStore()
-
-  // Validate stored token against the server on startup
-  useEffect(() => {
-    initialize()
-  }, [initialize])
-
-  // When a user with a saved theme signs in, adopt it as the preferred theme
-  useEffect(() => {
-    if (user?.theme) setPreferredTheme(user.theme)
-  }, [user?.theme]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const theme = user?.theme || preferredTheme
+  const theme = useThemeStore((s) => s.theme)
 
   return (
     <div data-theme={theme} className="min-h-screen">
       <BrowserRouter>
+        <Navbar />
         <Routes>
-          <Route path="/" element={<OptionalRoute><Home /></OptionalRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
-          <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          {/* Admin-only route example */}
-          <Route path="/admin" element={<AdminRoute><Dashboard /></AdminRoute>} />
+          <Route path="/" element={<Home />} />
+          <Route path="/upload/:token" element={<UploadPage />} />
+          <Route path="/d/:fileId" element={<DownloadPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={
             <div className="min-h-screen flex items-center justify-center text-center p-8">
               <div>

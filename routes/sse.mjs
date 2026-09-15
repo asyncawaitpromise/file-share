@@ -1,22 +1,19 @@
-// Server-Sent Events example route.
-//
-// The client connects once and receives a stream of events. Useful for
-// pushing real-time updates (notifications, job progress, etc.) without
-// polling.
+// Live updates for the current anonymous session (and, if the fs_admin
+// cookie is valid, the global admin feed too) — lets the history/admin
+// pages update instantly instead of polling.
 //
 // Client usage:
-//   const token = useAuthStore.getState().token;
-//   const es = new EventSource(`/api/sse/stream?token=${token}`);
-//   es.addEventListener('update', (e) => console.log(JSON.parse(e.data)));
-//   es.addEventListener('heartbeat', (e) => {});
+//   const es = new EventSource('/api/sse/stream', { withCredentials: true })
+//   es.addEventListener('update', (e) => console.log(JSON.parse(e.data)))
+//   es.addEventListener('admin', (e) => console.log(JSON.parse(e.data)))
 
 import { Router } from 'express';
-import { requireAuth } from '../middlewares/requireAuth.mjs';
 import appEvents from '../events.mjs';
+import { isAdminRequest } from '../middlewares/requireAdmin.mjs';
 
 const router = Router();
 
-router.get('/stream', requireAuth, (req, res) => {
+router.get('/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -26,25 +23,24 @@ router.get('/stream', requireAuth, (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  // Send connected confirmation
-  send('connected', { userId: req.user.id });
+  send('connected', {});
 
-  // Heartbeat every 30 seconds to keep the connection alive through proxies
   const heartbeat = setInterval(() => send('heartbeat', { ts: Date.now() }), 30_000);
 
-  // Listen for app events targeted at this user
-  const eventKey = `update:${req.user.id}`;
-  const listener = (data) => send('update', data);
-  appEvents.on(eventKey, listener);
+  const sessionListener = (data) => send('update', data);
+  appEvents.on(`session:${req.sessionId}`, sessionListener);
+
+  let adminListener = null;
+  if (isAdminRequest(req)) {
+    adminListener = (data) => send('admin', data);
+    appEvents.on('admin', adminListener);
+  }
 
   req.on('close', () => {
     clearInterval(heartbeat);
-    appEvents.off(eventKey, listener);
+    appEvents.off(`session:${req.sessionId}`, sessionListener);
+    if (adminListener) appEvents.off('admin', adminListener);
   });
 });
-
-// Example: emit an update to a user from anywhere in the app:
-//   import appEvents from '../events.mjs';
-//   appEvents.emit(`update:${userId}`, { type: 'notification', message: 'Hello!' });
 
 export default router;
