@@ -57,7 +57,7 @@ CUSTOM_DOMAIN="${APP_NAME}.${APP_DOMAIN}"
 # ============================================================
 echo "==> Verifying caprover CLI login for $CAPROVER_URL..."
 
-CAPROVER_NAME=$(caprover ls 2>/dev/null \
+CAPROVER_NAME=$(timeout 15s caprover ls < /dev/null 2>/dev/null \
   | awk -v url="${CAPROVER_URL%/}" '$0 ~ url { print $2 }')
 
 if [[ -z "$CAPROVER_NAME" ]]; then
@@ -75,12 +75,27 @@ cap_api() {
     [[ -n "$body" ]] && echo "            $body"
     return
   fi
-  caprover api \
+
+  # < /dev/null + timeout: if the CLI's stored session token has expired,
+  # `caprover api` silently falls back to an interactive password prompt
+  # instead of erroring out. With no TTY attached that prompt just hangs
+  # forever. Closing stdin makes it fail fast instead; the timeout is a
+  # backstop against any other kind of hang (unresponsive server, etc).
+  if ! timeout 30s caprover api \
     --caproverName "$CAPROVER_NAME" \
     --method "$method" \
     --path "$cli_path" \
     ${body:+--data "$body"} \
-    --output false
+    --output false < /dev/null; then
+    local status=$?
+    if [[ $status -eq 124 ]]; then
+      echo "Error: caprover api call timed out after 30s ($method $cli_path)" >&2
+    else
+      echo "Error: caprover api call failed ($method $cli_path)" >&2
+    fi
+    echo "       Your CapRover CLI session may have expired — try: caprover login" >&2
+    return $status
+  fi
 }
 
 # ============================================================

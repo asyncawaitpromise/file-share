@@ -120,7 +120,7 @@ if ! $GH_ONLY; then
     fi
   done
 
-  CAPROVER_NAME=$(caprover ls 2>/dev/null \
+  CAPROVER_NAME=$(timeout 15s caprover ls < /dev/null 2>/dev/null \
     | awk -v url="${CAPROVER_URL%/}" '$0 ~ url { print $2 }')
   if [[ -z "$CAPROVER_NAME" ]]; then
     echo "Error: no caprover CLI session found for $CAPROVER_URL" >&2
@@ -173,12 +173,20 @@ if ! $GH_ONLY; then
     echo "  [dry-run] Would set: $(echo "$ENV_JSON" | jq -r '[.[].key] | join(", ")')"
   else
     TMPFILE=$(mktemp)
-    caprover api \
+    # < /dev/null + timeout: an expired CLI session makes `caprover api` fall
+    # back to an interactive password prompt instead of erroring out, which
+    # hangs forever with no TTY attached. Closing stdin fails it fast.
+    if ! timeout 30s caprover api \
       --caproverName "$CAPROVER_NAME" \
       --method GET \
       --path /user/apps/appDefinitions \
       --data '{}' \
-      --output "$TMPFILE"
+      --output "$TMPFILE" < /dev/null; then
+      rm -f "$TMPFILE"
+      echo "Error: caprover api call failed or timed out — your CLI session may have expired" >&2
+      echo "       Try: caprover login" >&2
+      exit 1
+    fi
     EXISTING=$(jq --arg app "$CAPROVER_APP" \
       '.appDefinitions[] | select(.appName == $app)' \
       "$TMPFILE")
@@ -194,12 +202,16 @@ if ! $GH_ONLY; then
     # envVars — this preserves instanceCount, volumes, and everything else.
     APP_CONFIG=$(echo "$EXISTING" | jq --argjson env "$ENV_JSON" '.envVars = $env')
 
-    caprover api \
+    if ! timeout 30s caprover api \
       --caproverName "$CAPROVER_NAME" \
       --method POST \
       --path /user/apps/appDefinitions/update \
       --data "$APP_CONFIG" \
-      --output false
+      --output false < /dev/null; then
+      echo "Error: caprover api call failed or timed out — your CLI session may have expired" >&2
+      echo "       Try: caprover login" >&2
+      exit 1
+    fi
 
     echo "  Done ($(echo "$ENV_JSON" | jq -r '[.[].key] | join(", ")'))"
   fi
