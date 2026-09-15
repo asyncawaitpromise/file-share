@@ -56,7 +56,15 @@ jobs:
           CAPTAIN_DEF=$(jq -nc --arg img "$IMAGE" '{"schemaVersion":2,"imageName":$img}')
           BODY=$(jq -nc --arg def "$CAPTAIN_DEF" '{"captainDefinitionContent":$def,"gitHash":""}')
 
-          curl -sf -X POST "$CAPROVER_URL/api/v2/user/apps/appData/$APP_NAME" \
+          RESPONSE=$(curl -sf -X POST "$CAPROVER_URL/api/v2/user/apps/appData/$APP_NAME" \
             -H "Content-Type: application/json" \
             -H "x-captain-auth: $ADMIN_TOKEN" \
-            -d "$BODY"
+            -d "$BODY")
+
+          echo "$RESPONSE" | jq .
+          # CapRover's API always responds HTTP 200, even on its own internal
+          # errors — the real result is in the status field (100 = success).
+          if [[ "$(echo "$RESPONSE" | jq -r '.status')" != "100" ]]; then
+            echo "::error::CapRover deploy failed: $(echo "$RESPONSE" | jq -r '.description')"
+            exit 1
+          fi
